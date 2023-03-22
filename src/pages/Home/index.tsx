@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useContext, useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { HandPalm, Play } from 'phosphor-react'
 import { CountDownContainer, CountDownSeparator, FormContainer, FormContainerTaskInput, FormContainerTimeAmountInput, HomeContainer, StartCountDownButton, StopCountDownButton } from './styles'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as zod from 'zod'
+import { CycleContext } from '../../contexts/CycleContext'
 
 const newCycleFormValidationSchema = zod.object({
   task: zod.string().min(1, 'Informe a tarefa.'),
@@ -14,38 +15,17 @@ const newCycleFormValidationSchema = zod.object({
 
 type NewCycleFormData = zod.infer<typeof newCycleFormValidationSchema>
 
-interface Cycle {
-  id: string
-  task: string
-  timeAmount: number
-  startDate: number
-  status: "in progress" | "interrupted" | "completed"
-}
-
 export function Home() {
-  const [cycles, setCycles] = useState<Cycle[]>([])
-  const [activeCycleId, setActiveCycleId] = useState<string | null>(null)
-  const [countDownSecods, setCountDownSecods] = useState<number>(0)
 
-  useEffect(() => {
-    let interval: number
-    const activeCycle = cycles.find(cycle => cycle.id === activeCycleId)
-    if (activeCycle) {
-      interval = setInterval(() => {
-        const now = new Date().getTime()
-        const timePassedInSeconds = Math.floor((now - activeCycle.startDate) / 1000)
-        const timeAmountInSeconds = activeCycle.timeAmount * 60
-        const newCountDownSecods = timeAmountInSeconds - timePassedInSeconds
-        if (newCountDownSecods === 0) {
-          handleCompleteCycle()
-          clearInterval(interval)
-        } else {
-          setCountDownSecods(newCountDownSecods)
-        }
-      }, 1000)
-    }
-    return () => clearInterval(interval)
-  }, [activeCycleId])
+  const {
+    activeCycle,
+    activeCycleId,
+    countDownSecods,
+    startNewCycle,
+    interruptCurrentCycle,
+    completeCurrentCycle,
+    updateCountDownSecods,
+  } = useContext(CycleContext)
 
   const { register, handleSubmit, watch, reset } = useForm<NewCycleFormData>({
     resolver: zodResolver(newCycleFormValidationSchema),
@@ -55,36 +35,42 @@ export function Home() {
     }
   })
 
-  function handleCreateNewCycle(data: NewCycleFormData) {
-    const newClycle: Cycle = {
-      id: String(new Date().getTime()),
-      task: data.task,
-      timeAmount: data.timeAmount,
-      startDate: new Date().getTime(),
-      status: 'in progress'
+  useEffect(() => {
+    let interval: number
+    if (activeCycle) {
+      interval = setInterval(() => {
+        const now = new Date().getTime()
+        const timePassedInSeconds = Math.floor((now - new Date(activeCycle.startedAt).getTime()) / 1000)
+        const timeAmountInSeconds = activeCycle.timeAmount * 60
+        const newCountDownSecods = timeAmountInSeconds - timePassedInSeconds
+        if (newCountDownSecods === 0) {
+          handleCompleteCycle()
+          clearInterval(interval)
+        } else {
+          updateCountDownSecods(newCountDownSecods)
+        }
+      }, 1000)
     }
-    setCycles(prevCycles => [...prevCycles, newClycle])
-    setActiveCycleId(newClycle.id)
-    setCountDownSecods(newClycle.timeAmount * 60)
+    return () => clearInterval(interval)
+  }, [activeCycleId])
+
+  function handleCreateNewCycle(newCycleForm: NewCycleFormData) {
+    const now = new Date()
+    startNewCycle({
+      id: String(now.getTime()),
+      task: newCycleForm.task,
+      timeAmount: newCycleForm.timeAmount,
+      startedAt: now
+    })
   }
 
   function handleInterruptCycle() {
-    setCycles(prevCycles => prevCycles.map((cycle) => {
-      if (cycle.id === activeCycleId) return { ...cycle, status: 'interrupted' }
-      else return cycle
-    }))
-    setActiveCycleId(null)
-    setCountDownSecods(0)
+    interruptCurrentCycle()
     reset()
   }
 
   function handleCompleteCycle() {
-    setCycles(prevCycles => prevCycles.map((cycle) => {
-      if (cycle.id === activeCycleId) return { ...cycle, status: 'completed' }
-      else return cycle
-    }))
-    setActiveCycleId(null)
-    setCountDownSecods(0)
+    completeCurrentCycle()
     reset()
   }
 
