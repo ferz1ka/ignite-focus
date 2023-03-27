@@ -16,8 +16,6 @@ interface CycleContextProps {
 
 export const CycleContext = createContext({} as CycleContextProps)
 
-
-
 export function CycleContextProvider({ children }: { children: ReactNode }) {
 
   const [cycleState, dispatch] = useReducer(cycleReducer, {
@@ -44,7 +42,11 @@ export function CycleContextProvider({ children }: { children: ReactNode }) {
 
   function reducerInitializer() {
     const storedStateJSON = localStorage.getItem("@ignite-focus:cycleState-v1")
-    if (storedStateJSON) return JSON.parse(storedStateJSON)
+    if (storedStateJSON && storedStateJSON !== "undefined") return JSON.parse(storedStateJSON)
+    else return {
+      cycles: [],
+      activeCycleId: null,
+    }
   }
 
   function startNewCycle(newCycle: Cycle) {
